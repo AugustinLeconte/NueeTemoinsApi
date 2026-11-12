@@ -3,6 +3,7 @@ package com.nueetemoins.backend.card;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,12 +14,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nueetemoins.backend.card.dto.CardAdminResponse;
 import com.nueetemoins.backend.card.dto.CardRequest;
 import com.nueetemoins.backend.card.dto.CardResponse;
 import com.nueetemoins.backend.card.dto.FeastDateRequest;
 import com.nueetemoins.backend.card.dto.TranslationRequest;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -41,6 +44,10 @@ public class CardController {
         return cardService.findByPublicId(publicId, lang, country);
     }
 
+    @GetMapping("/{publicId}/admin")
+    public CardAdminResponse getAdmin(@PathVariable String publicId) { return cardService.findAdmin(publicId); }
+
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CardResponse create(@Valid @RequestBody CardRequest request,
@@ -56,11 +63,29 @@ public class CardController {
         cardService.putTranslation(publicId, locale, request);
     }
 
+    @PutMapping("/{publicId}/families")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void putFamilies(@PathVariable String publicId,
+                            @RequestBody @NotEmpty List<String> families) {
+        cardService.putFamilies(publicId, families);
+    }
+
     @PutMapping("/{publicId}/feast-dates/{countryCode}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void putFeastDate(@PathVariable String publicId, @PathVariable String countryCode,
                              @Valid @RequestBody FeastDateRequest request) {
         cardService.putFeastDate(publicId, countryCode, request);
     }
+
+    @PutMapping("/{publicId}")
+    public CardResponse update(@PathVariable String publicId, @Valid @RequestBody CardRequest request,
+                            @RequestParam(required = false) String lang,
+                            @RequestParam(required = false) String country) {
+        return cardService.update(publicId, request, lang, country);
+    }
+
+    @DeleteMapping("/{publicId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable String publicId) { cardService.delete(publicId); }
 }
     

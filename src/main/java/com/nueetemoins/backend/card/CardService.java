@@ -3,15 +3,21 @@ package com.nueetemoins.backend.card;
 import java.time.DateTimeException;
 import java.time.MonthDay;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.nueetemoins.backend.card.dto.CardAdminResponse;
 import com.nueetemoins.backend.card.dto.CardRequest;
 import com.nueetemoins.backend.card.dto.CardResponse;
 import com.nueetemoins.backend.card.dto.FeastDateRequest;
 import com.nueetemoins.backend.card.dto.TranslationRequest;
+import com.nueetemoins.backend.common.PublicIdGenerator;
+import com.nueetemoins.backend.family.FamilyService;
+import com.nueetemoins.backend.family.dto.FamilyResponse;
 
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +30,7 @@ public class CardService {
     private static final String DEFAULT_COUNTRY = "FR";
 
     private final CardRepository cardRepository;
+    private final FamilyService familyService;
 
     @Transactional(readOnly = true)
     public List<CardResponse> findAll(String lang, String country) {
@@ -39,12 +46,9 @@ public class CardService {
 
     @Transactional
     public CardResponse create(CardRequest req, String lang, String country) {
-        if (cardRepository.existsByPublicId(req.publicId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "publicId already exists");
-        }
         Card card = new Card();
-        card.setPublicId(req.publicId());
-        card.setFamily(req.family());
+        card.setPublicId(newPublicId());
+        card.getFamilies().addAll(familyService.resolveAll(req.families()));
         card.setRarity(req.rarity());
         card.setImageUrl(req.imageUrl());
 
@@ -85,6 +89,60 @@ public class CardService {
         t.setDescription(req.description());
     }
 
+    @Transactional
+    public void putFamilies(String publicId, List<String> familyIds) {
+        Card card = getOrThrow(publicId);
+        card.getFamilies().clear();
+        card.getFamilies().addAll(familyService.resolveAll(familyIds));
+    }
+
+    @Transactional(readOnly = true)
+    public CardAdminResponse findAdmin(String publicId) {
+        Card c = getOrThrow(publicId);
+        return new CardAdminResponse(
+            c.getPublicId(),
+            c.getFamilies().stream().map(fam -> fam.getPublicId()).toList(),
+            c.getRarity(), c.getImageUrl(),
+            c.getTranslations().stream()
+                .map(t -> new TranslationRequest(t.getLocale(), t.getTitle(), t.getSubtitle(), t.getDescription()))
+                .toList(),
+            c.getFeastDates().stream()
+                .map(fd -> new FeastDateRequest(fd.getCountryCode(), fd.getMonth(), fd.getDay()))
+                .toList());
+    }
+
+    @Transactional
+    public CardResponse update(String publicId, CardRequest req, String lang, String country) {
+        Card card = getOrThrow(publicId);
+        card.setRarity(req.rarity());
+        if (req.imageUrl() != null) card.setImageUrl(req.imageUrl());   // null = on garde l'image
+
+        card.getFamilies().clear();
+        card.getFamilies().addAll(familyService.resolveAll(req.families()));
+
+        Set<String> locales = req.translations().stream()
+            .map(t -> normLocale(t.locale())).collect(Collectors.toSet());
+        if (!locales.contains(DEFAULT_LOCALE)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "A '" + DEFAULT_LOCALE + "' translation is required");
+        }
+        card.getTranslations().removeIf(t -> !locales.contains(t.getLocale()));
+        req.translations().forEach(t -> upsertTranslation(card, t));
+
+        List<FeastDateRequest> feasts = req.feastDates() == null ? List.of() : req.feastDates();
+        Set<String> countries = feasts.stream()
+            .map(fd -> normCountry(fd.countryCode())).collect(Collectors.toSet());
+        card.getFeastDates().removeIf(fd -> !countries.contains(fd.getCountryCode()));
+        feasts.forEach(fd -> upsertFeastDate(card, fd));
+
+        return toResponse(card, normLocale(lang), normCountry(country));
+    }
+
+    @Transactional
+    public void delete(String publicId) {
+        cardRepository.delete(getOrThrow(publicId));
+    }
+
     private void upsertFeastDate(Card card, FeastDateRequest req) {
         try {
             MonthDay.of(req.month(), req.day()); 
@@ -109,21 +167,33 @@ public class CardService {
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.INTERNAL_SERVER_ERROR, "No translation for " + c.getPublicId()));
 
-        CardFeastDate f = c.findFeastDate(country)
+        CardFeastDate feastDate = c.findFeastDate(country)
             .or(() -> c.findFeastDate(DEFAULT_COUNTRY))
             .orElse(null);
 
+        List<FamilyResponse> families = c.getFamilies().stream()
+        .map(family -> familyService.toResponse(family, lang))
+        .toList();
+
         return new CardResponse(
-            c.getPublicId(), c.getFamily(), c.getRarity(), c.getImageUrl(),
+            c.getPublicId(), families, c.getRarity(), c.getImageUrl(),
             t.getLocale(), t.getTitle(), t.getSubtitle(), t.getDescription(),
-            f != null ? f.getCountryCode() : null,
-            f != null ? f.getMonth() : null,
-            f != null ? f.getDay() : null);
+            feastDate != null ? feastDate.getCountryCode() : null,
+            feastDate != null ? feastDate.getMonth() : null,
+            feastDate != null ? feastDate.getDay() : null);
     }
 
     private Card getOrThrow(String publicId) {
         return cardRepository.findByPublicId(publicId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Card not found"));
+    }
+
+    private String newPublicId() {
+        String id;
+        do {
+            id = PublicIdGenerator.generate(6);
+        } while (cardRepository.existsByPublicId(id));
+        return id;
     }
 
     private static String normLocale(String l)  { return (l == null || l.isBlank()) ? DEFAULT_LOCALE  : l.trim().toLowerCase(); }

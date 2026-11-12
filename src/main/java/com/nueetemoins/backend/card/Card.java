@@ -1,11 +1,15 @@
 package com.nueetemoins.backend.card;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.hibernate.annotations.BatchSize;
+
+import com.nueetemoins.backend.family.Family;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -15,6 +19,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Getter;
@@ -33,9 +40,12 @@ public class Card {
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private String publicId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CardFamily family;
+    @ManyToMany
+    @JoinTable(name = "card_families",
+        joinColumns = @JoinColumn(name = "card_id"),
+        inverseJoinColumns = @JoinColumn(name = "family_id"))
+    @BatchSize(size = 50)
+    private Set<Family> families = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

@@ -5,7 +5,10 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.nueetemoins.backend.family.Family;
+
 public interface CardRepository extends JpaRepository<Card, UUID> {
     Optional<Card> findByPublicId(String publicId);
     boolean existsByPublicId(String publicId);
+    boolean existsByFamiliesContaining(Family family);
 }
