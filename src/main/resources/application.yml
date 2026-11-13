@@ -8,3 +8,16 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+storage:
+  endpoint: ${AWS_ENDPOINT_URL_S3}
+  region: ${AWS_REGION:eu-central-1}
+  bucket: ${S3_BUCKET}
+  access-key: ${AWS_ACCESS_KEY_ID}
+  secret-key: ${AWS_SECRET_ACCESS_KEY}
+  prefix: ${STORAGE_PREFIX:prod}
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}

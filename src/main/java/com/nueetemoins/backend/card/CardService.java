@@ -18,8 +18,11 @@ import com.nueetemoins.backend.card.dto.TranslationRequest;
 import com.nueetemoins.backend.common.PublicIdGenerator;
 import com.nueetemoins.backend.family.FamilyService;
 import com.nueetemoins.backend.family.dto.FamilyResponse;
+import com.nueetemoins.backend.image.ImageStorageService;
 
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -31,6 +34,7 @@ public class CardService {
 
     private final CardRepository cardRepository;
     private final FamilyService familyService;
+    private final ImageStorageService imageStorage;
 
     @Transactional(readOnly = true)
     public List<CardResponse> findAll(String lang, String country) {
@@ -115,7 +119,11 @@ public class CardService {
     public CardResponse update(String publicId, CardRequest req, String lang, String country) {
         Card card = getOrThrow(publicId);
         card.setRarity(req.rarity());
-        if (req.imageUrl() != null) card.setImageUrl(req.imageUrl());   // null = on garde l'image
+        String oldImageUrl = card.getImageUrl();
+        if (req.imageUrl() != null && !req.imageUrl().equals(oldImageUrl)) {
+            card.setImageUrl(req.imageUrl());
+            deleteImageAfterCommit(oldImageUrl);
+        }
 
         card.getFamilies().clear();
         card.getFamilies().addAll(familyService.resolveAll(req.families()));
@@ -140,7 +148,10 @@ public class CardService {
 
     @Transactional
     public void delete(String publicId) {
-        cardRepository.delete(getOrThrow(publicId));
+        Card card = getOrThrow(publicId);
+        String imageUrl = card.getImageUrl();
+        cardRepository.delete(card);
+        deleteImageAfterCommit(imageUrl);
     }
 
     private void upsertFeastDate(Card card, FeastDateRequest req) {
@@ -194,6 +205,16 @@ public class CardService {
             id = PublicIdGenerator.generate(6);
         } while (cardRepository.existsByPublicId(id));
         return id;
+    }
+
+    private void deleteImageAfterCommit(String url) {
+        if (url == null) return;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                imageStorage.deleteByUrl(url);
+            }
+        });
     }
 
     private static String normLocale(String l)  { return (l == null || l.isBlank()) ? DEFAULT_LOCALE  : l.trim().toLowerCase(); }
