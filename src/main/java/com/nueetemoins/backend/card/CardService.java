@@ -8,9 +8,13 @@ import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.nueetemoins.backend.card.dto.CardAdminResponse;
+import com.nueetemoins.backend.card.dto.CardArtResponse;
 import com.nueetemoins.backend.card.dto.CardRequest;
 import com.nueetemoins.backend.card.dto.CardResponse;
 import com.nueetemoins.backend.card.dto.FeastDateRequest;
@@ -19,10 +23,8 @@ import com.nueetemoins.backend.common.PublicIdGenerator;
 import com.nueetemoins.backend.family.FamilyService;
 import com.nueetemoins.backend.family.dto.FamilyResponse;
 import com.nueetemoins.backend.image.ImageStorageService;
+import com.nueetemoins.backend.player.PlayerCardRepository;
 
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -35,6 +37,8 @@ public class CardService {
     private final CardRepository cardRepository;
     private final FamilyService familyService;
     private final ImageStorageService imageStorage;
+    private final CardArtService cardArtService;
+    private final PlayerCardRepository playerCardRepository;
 
     @Transactional(readOnly = true)
     public List<CardResponse> findAll(String lang, String country) {
@@ -53,8 +57,6 @@ public class CardService {
         Card card = new Card();
         card.setPublicId(newPublicId());
         card.getFamilies().addAll(familyService.resolveAll(req.families()));
-        card.setRarity(req.rarity());
-        card.setImageUrl(req.imageUrl());
 
         req.translations().forEach(t -> upsertTranslation(card, t));
         if (req.feastDates() != null) {
@@ -106,7 +108,6 @@ public class CardService {
         return new CardAdminResponse(
             c.getPublicId(),
             c.getFamilies().stream().map(fam -> fam.getPublicId()).toList(),
-            c.getRarity(), c.getImageUrl(),
             c.getTranslations().stream()
                 .map(t -> new TranslationRequest(t.getLocale(), t.getTitle(), t.getSubtitle(), t.getDescription()))
                 .toList(),
@@ -118,12 +119,6 @@ public class CardService {
     @Transactional
     public CardResponse update(String publicId, CardRequest req, String lang, String country) {
         Card card = getOrThrow(publicId);
-        card.setRarity(req.rarity());
-        String oldImageUrl = card.getImageUrl();
-        if (req.imageUrl() != null && !req.imageUrl().equals(oldImageUrl)) {
-            card.setImageUrl(req.imageUrl());
-            deleteImageAfterCommit(oldImageUrl);
-        }
 
         card.getFamilies().clear();
         card.getFamilies().addAll(familyService.resolveAll(req.families()));
@@ -149,14 +144,17 @@ public class CardService {
     @Transactional
     public void delete(String publicId) {
         Card card = getOrThrow(publicId);
-        String imageUrl = card.getImageUrl();
+        if (playerCardRepository.existsByCardId(card.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Card is owned by players");
+        }
+        List<String> urls = card.getArts().stream().map(CardArt::getImageUrl).toList();
         cardRepository.delete(card);
-        deleteImageAfterCommit(imageUrl);
+        urls.forEach(this::deleteImageAfterCommit);
     }
 
     private void upsertFeastDate(Card card, FeastDateRequest req) {
         try {
-            MonthDay.of(req.month(), req.day()); 
+            MonthDay.of(req.month(), req.day());
         } catch (DateTimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid feast date");
         }
@@ -172,7 +170,8 @@ public class CardService {
         f.setDay(req.day());
     }
 
-    private CardResponse toResponse(Card c, String lang, String country) {
+    /** Public : réutilisé par le côté joueur. À appeler dans une transaction. */
+    public CardResponse toResponse(Card c, String lang, String country) {
         CardTranslation t = c.findTranslation(lang)
             .or(() -> c.findTranslation(DEFAULT_LOCALE))
             .orElseThrow(() -> new ResponseStatusException(
@@ -183,15 +182,20 @@ public class CardService {
             .orElse(null);
 
         List<FamilyResponse> families = c.getFamilies().stream()
-        .map(family -> familyService.toResponse(family, lang))
-        .toList();
+            .map(family -> familyService.toResponse(family, lang))
+            .toList();
+
+        CardArtResponse defaultArt = c.findDefaultArt()
+            .map(a -> cardArtService.toResponse(a, lang))
+            .orElse(null);
 
         return new CardResponse(
-            c.getPublicId(), families, c.getRarity(), c.getImageUrl(),
+            c.getPublicId(), families,
             t.getLocale(), t.getTitle(), t.getSubtitle(), t.getDescription(),
             feastDate != null ? feastDate.getCountryCode() : null,
             feastDate != null ? feastDate.getMonth() : null,
-            feastDate != null ? feastDate.getDay() : null);
+            feastDate != null ? feastDate.getDay() : null,
+            defaultArt);
     }
 
     private Card getOrThrow(String publicId) {

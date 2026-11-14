@@ -47,7 +47,6 @@ public class CardController {
     @GetMapping("/{publicId}/admin")
     public CardAdminResponse getAdmin(@PathVariable String publicId) { return cardService.findAdmin(publicId); }
 
-
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CardResponse create(@Valid @RequestBody CardRequest request,
@@ -79,8 +78,8 @@ public class CardController {
 
     @PutMapping("/{publicId}")
     public CardResponse update(@PathVariable String publicId, @Valid @RequestBody CardRequest request,
-                            @RequestParam(required = false) String lang,
-                            @RequestParam(required = false) String country) {
+                               @RequestParam(required = false) String lang,
+                               @RequestParam(required = false) String country) {
         return cardService.update(publicId, request, lang, country);
     }
 
@@ -88,4 +87,3 @@ public class CardController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String publicId) { cardService.delete(publicId); }
 }
-    

@@ -14,8 +14,6 @@ import com.nueetemoins.backend.family.Family;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -47,13 +45,6 @@ public class Card {
     @BatchSize(size = 50)
     private Set<Family> families = new HashSet<>();
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CardRarity rarity;
-
-    @Column(name = "image_url")
-    private String imageUrl;
-
     @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)
     private List<CardTranslation> translations = new ArrayList<>();
@@ -62,11 +53,19 @@ public class Card {
     @BatchSize(size = 50)
     private List<CardFeastDate> feastDates = new ArrayList<>();
 
+    @OneToMany(mappedBy = "card", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
+    private List<CardArt> arts = new ArrayList<>();
+
     public Optional<CardTranslation> findTranslation(String locale) {
         return translations.stream().filter(t -> t.getLocale().equals(locale)).findFirst();
     }
 
     public Optional<CardFeastDate> findFeastDate(String countryCode) {
         return feastDates.stream().filter(f -> f.getCountryCode().equals(countryCode)).findFirst();
+    }
+
+    public Optional<CardArt> findDefaultArt() {
+        return arts.stream().filter(CardArt::isDefault).findFirst();
     }
 }
