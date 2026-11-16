@@ -20,7 +20,7 @@ public final class GameRules {
     public static final int XP_NEW_ART = 5;
     public static final int XP_CARD_UPGRADE = 20;
 
-    public static final int DAILY_COINS = 100;
+    public static final int DAILY_COINS = 25;
     public static final int AD_COINS = 50;
     public static final int AD_MAX_PER_DAY = 5;
     public static final int AD_COOLDOWN_SECONDS = 60;

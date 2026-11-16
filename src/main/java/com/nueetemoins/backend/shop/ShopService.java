@@ -41,6 +41,7 @@ public class ShopService {
     /** Même joueur + même jour = mêmes illustrations. */
     private List<CardArt> dailyShopArts(String userId) {
         List<CardArt> pool = new ArrayList<>(cardArtRepository.findBySourceWithCard(ArtSource.SHOP));
+        pool.addAll(cardArtRepository.findBySourceWithCard(ArtSource.PACK));
         pool.removeIf(a -> !a.isObtainable());
         pool.sort(Comparator.comparing(CardArt::getPublicId));
         long seed = LocalDate.now(PlayerCollectionService.ZONE).toEpochDay() * 31L + userId.hashCode();
