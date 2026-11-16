@@ -41,7 +41,8 @@ public class JwtFilter extends OncePerRequestFilter {
         if ("OPTIONS".equalsIgnoreCase(method)) return true;
 
         boolean isGet = "GET".equalsIgnoreCase(method);
-        return isGet && (path.startsWith("/api/images/")
-        || (path.startsWith("/api/cards") && !path.endsWith("/admin")));
+        return isGet && (path.equals("/health")
+                || path.startsWith("/api/images/")
+                || (path.startsWith("/api/cards") && !path.endsWith("/admin")));
     }
 }
