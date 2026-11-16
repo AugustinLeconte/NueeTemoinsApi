@@ -23,6 +23,10 @@ public class PlayerWallet {
     @Column(nullable = false)
     private int coins;
 
+    /** Expérience totale du joueur (le niveau en est déduit, cf. GameRules). */
+    @Column(nullable = false)
+    private int xp;
+
     /** Pity : nombre de packs consécutifs sans illustration RARE+. */
     @Column(name = "packs_since_rare", nullable = false)
     private int packsSinceRare;

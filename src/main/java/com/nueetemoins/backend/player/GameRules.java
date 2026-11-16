@@ -13,6 +13,32 @@ final class GameRules {
     /** Multiplicateur de probabilité du saint fêté le jour même. */
     static final int FEAST_BOOST = 5;
 
+    // ---------- Niveaux du joueur ----------
+    static final int MAX_PLAYER_LEVEL = 50;
+
+    // XP gagnée par action
+    static final int XP_PACK_OPENED = 25;
+    static final int XP_NEW_CARD = 15;      // nouveau saint dans un pack
+    static final int XP_NEW_ART = 5;        // nouvelle illustration d'un saint déjà possédé
+    static final int XP_CARD_UPGRADE = 20;  // montée de niveau d'un saint
+
+    /** XP total nécessaire pour atteindre le niveau L : 100, 250, 450, 700... (paliers de +100, +150, +200...). */
+    static int xpToReach(int level) {
+        int n = level - 1;
+        return 100 * n + 25 * n * (n - 1);
+    }
+
+    static int levelForXp(int xp) {
+        int level = 1;
+        while (level < MAX_PLAYER_LEVEL && xp >= xpToReach(level + 1)) level++;
+        return level;
+    }
+
+    /** Pack débloqué à chaque niveau (niveaux 2+) : premium tous les 5 niveaux. */
+    static PackType levelPackType(int level) {
+        return level % 5 == 0 ? PackType.PREMIUM : PackType.STANDARD;
+    }
+
     /** Fragments du saint gagnés quand on tire une de ses illustrations déjà possédée. */
     static int duplicateFragments(CardRarity r) {
         return switch (r) {

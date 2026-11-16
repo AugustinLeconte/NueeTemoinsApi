@@ -14,8 +14,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nueetemoins.backend.player.dto.EquipRequest;
+import com.nueetemoins.backend.player.dto.PackOfferResponse;
 import com.nueetemoins.backend.player.dto.PackResult;
 import com.nueetemoins.backend.player.dto.PlayerCardResponse;
+import com.nueetemoins.backend.player.dto.ProgressResponse;
 import com.nueetemoins.backend.player.dto.ShopItemResponse;
 import com.nueetemoins.backend.player.dto.UpgradeResponse;
 import com.nueetemoins.backend.player.dto.WalletResponse;
@@ -33,6 +35,7 @@ public class PlayerController {
     private final PlayerCollectionService collectionService;
     private final PackService packService;
     private final ProfileService profileService;
+    private final PlayerProgressService progressService;
 
     @GetMapping("/wallet")
     public WalletResponse wallet(@RequestAttribute("userId") String userId) {
@@ -77,5 +80,25 @@ public class PlayerController {
                               @PathVariable String artPublicId) {
         profileService.require(userId);
         return collectionService.buy(userId, artPublicId);
+    }
+
+    // ---------- Niveau du joueur & packs de niveau ----------
+
+    @GetMapping("/progress")
+    public ProgressResponse progress(@RequestAttribute("userId") String userId) {
+        profileService.require(userId);
+        return progressService.progress(userId);
+    }
+
+    @GetMapping("/shop/packs")
+    public List<PackOfferResponse> packOffers(@RequestAttribute("userId") String userId) {
+        profileService.require(userId);
+        return progressService.packOffers(userId);
+    }
+
+    @PostMapping("/shop/packs/{level}/open")
+    public PackResult openLevelPack(@RequestAttribute("userId") String userId, @PathVariable int level) {
+        var p = profileService.require(userId);
+        return progressService.openLevelPack(userId, level, p.language(), p.country());
     }
 }

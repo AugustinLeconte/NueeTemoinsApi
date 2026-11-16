@@ -20,6 +20,7 @@ import com.nueetemoins.backend.card.CardArtRepository;
 import com.nueetemoins.backend.card.CardArtService;
 import com.nueetemoins.backend.card.CardService;
 import com.nueetemoins.backend.player.dto.PlayerCardResponse;
+import com.nueetemoins.backend.player.dto.ProgressResponse;
 import com.nueetemoins.backend.player.dto.ShopItemResponse;
 import com.nueetemoins.backend.player.dto.UpgradeResponse;
 import com.nueetemoins.backend.player.dto.WalletResponse;
@@ -38,6 +39,7 @@ public class PlayerCollectionService {
     private final CardArtRepository cardArtRepository;
     private final CardService cardService;
     private final CardArtService cardArtService;
+    private final PlayerPackClaimRepository claimRepository;
 
     // ---------- Wallet ----------
 
@@ -63,6 +65,25 @@ public class PlayerCollectionService {
     WalletResponse toResponse(PlayerWallet w) {
         boolean available = !LocalDate.now(ZONE).equals(w.getLastDailyPack());
         return new WalletResponse(w.getCoins(), w.getPacksSinceRare(), available);
+    }
+
+    // ---------- Progression du joueur ----------
+
+    /** Ajoute de l'XP (plafonnée au niveau max). Renvoie true si le joueur change de niveau. */
+    boolean addXp(PlayerWallet w, int amount) {
+        int before = GameRules.levelForXp(w.getXp());
+        w.setXp(Math.min(w.getXp() + amount, GameRules.xpToReach(GameRules.MAX_PLAYER_LEVEL)));
+        return GameRules.levelForXp(w.getXp()) > before;
+    }
+
+    ProgressResponse progressOf(PlayerWallet w) {
+        int xp = w.getXp();
+        int level = GameRules.levelForXp(xp);
+        int base = GameRules.xpToReach(level);
+        Integer span = level >= GameRules.MAX_PLAYER_LEVEL ? null : GameRules.xpToReach(level + 1) - base;
+        // un pack par niveau à partir du niveau 2
+        int unclaimed = Math.max(0, (level - 1) - (int) claimRepository.countByUserId(w.getUserId()));
+        return new ProgressResponse(level, xp, xp - base, span, unclaimed);
     }
 
     // ---------- Collection ----------
@@ -102,7 +123,7 @@ public class PlayerCollectionService {
     /** Monte un saint d'un niveau en dépensant SES fragments. */
     @Transactional
     public UpgradeResponse upgrade(String userId, String cardPublicId) {
-        lockWallet(userId); // verrou global du joueur
+        PlayerWallet wallet = lockWallet(userId); // verrou global du joueur
         PlayerCard pc = getPlayerCard(userId, cardPublicId);
         Integer cost = GameRules.nextUpgradeCost(pc.getLevel());
         if (cost == null) {
@@ -113,7 +134,9 @@ public class PlayerCollectionService {
         }
         pc.setFragments(pc.getFragments() - cost);
         pc.setLevel(pc.getLevel() + 1);
-        return new UpgradeResponse(pc.getLevel(), pc.getFragments(), GameRules.nextUpgradeCost(pc.getLevel()));
+        boolean playerLevelUp = addXp(wallet, GameRules.XP_CARD_UPGRADE);
+        return new UpgradeResponse(pc.getLevel(), pc.getFragments(), GameRules.nextUpgradeCost(pc.getLevel()),
+            GameRules.XP_CARD_UPGRADE, playerLevelUp, progressOf(wallet));
     }
 
     // ---------- Boutique (pièces) ----------

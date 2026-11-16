@@ -71,6 +71,9 @@ public class PackService {
         boolean pityActive = wallet.getPacksSinceRare() >= GameRules.PITY_THRESHOLD;
         boolean gotRare = false;
         int cardsDrawn = 0;
+        int newCards = 0;
+        int newArts = 0;
+        int levelBefore = GameRules.levelForXp(wallet.getXp());
         int coinsTotal = 0;
         List<DrawnItem> draws = new ArrayList<>();
 
@@ -97,13 +100,18 @@ public class PackService {
             }
             GrantResult g = collection.grantArt(userId, art);
             cardsDrawn++;
+            if (g.newCard()) newCards++; else if (g.newArt()) newArts++;
             draws.add(DrawnItem.ofArt(cardArtService.toResponse(art, lang),
                 g.newArt(), g.newCard(), g.fragmentsGained(),
                 g.cardFragments(), g.cardLevel(), g.nextUpgradeCost()));
         }
 
         wallet.setPacksSinceRare(gotRare ? 0 : wallet.getPacksSinceRare() + 1);
-        return new PackResult(draws, coinsTotal, wallet.getCoins(), wallet.getPacksSinceRare());
+        int xpGained = GameRules.XP_PACK_OPENED
+            + newCards * GameRules.XP_NEW_CARD + newArts * GameRules.XP_NEW_ART;
+        collection.addXp(wallet, xpGained);
+        return new PackResult(type.name(), draws, coinsTotal, wallet.getCoins(), wallet.getPacksSinceRare(),
+            xpGained, levelBefore, collection.progressOf(wallet));
     }
 
     // ---------- Algorithme ----------
