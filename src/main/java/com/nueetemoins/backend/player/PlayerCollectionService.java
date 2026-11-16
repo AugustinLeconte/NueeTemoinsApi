@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.nueetemoins.backend.achievement.AchievementService;
 import com.nueetemoins.backend.card.ArtSource;
 import com.nueetemoins.backend.card.CardArt;
 import com.nueetemoins.backend.card.CardArtRepository;
@@ -40,14 +41,8 @@ public class PlayerCollectionService {
     private final CardService cardService;
     private final CardArtService cardArtService;
     private final PlayerPackClaimRepository claimRepository;
+    private final AchievementService achievementService;
 
-    // ---------- Wallet ----------
-
-    /**
-     * Récupère (ou crée) le wallet avec un verrou en écriture.
-     * Sert aussi de verrou global du joueur : toute action qui modifie ses fragments,
-     * niveaux ou pièces commence par là, ce qui évite les accès concurrents.
-     */
     @Transactional
     public PlayerWallet lockWallet(String userId) {
         return walletRepository.findForUpdate(userId).orElseGet(() -> {
@@ -59,17 +54,14 @@ public class PlayerCollectionService {
 
     @Transactional
     public WalletResponse wallet(String userId) {
-        return toResponse(lockWallet(userId));
+        return toResponse(lockWallet(userId), List.of());
     }
 
-    WalletResponse toResponse(PlayerWallet w) {
+    WalletResponse toResponse(PlayerWallet w, List<String> newAchievements) {
         boolean available = !LocalDate.now(ZONE).equals(w.getLastDailyPack());
-        return new WalletResponse(w.getCoins(), w.getPacksSinceRare(), available);
+        return new WalletResponse(w.getCoins(), w.getPacksSinceRare(), available, newAchievements);
     }
 
-    // ---------- Progression du joueur ----------
-
-    /** Ajoute de l'XP (plafonnée au niveau max). Renvoie true si le joueur change de niveau. */
     boolean addXp(PlayerWallet w, int amount) {
         int before = GameRules.levelForXp(w.getXp());
         w.setXp(Math.min(w.getXp() + amount, GameRules.xpToReach(GameRules.MAX_PLAYER_LEVEL)));
@@ -81,12 +73,9 @@ public class PlayerCollectionService {
         int level = GameRules.levelForXp(xp);
         int base = GameRules.xpToReach(level);
         Integer span = level >= GameRules.MAX_PLAYER_LEVEL ? null : GameRules.xpToReach(level + 1) - base;
-        // un pack par niveau à partir du niveau 2
         int unclaimed = Math.max(0, (level - 1) - (int) claimRepository.countByUserId(w.getUserId()));
         return new ProgressResponse(level, xp, xp - base, span, unclaimed);
     }
-
-    // ---------- Collection ----------
 
     @Transactional(readOnly = true)
     public List<PlayerCardResponse> collection(String userId, String lang, String country) {
@@ -120,10 +109,9 @@ public class PlayerCollectionService {
         pc.setEquippedArt(art);
     }
 
-    /** Monte un saint d'un niveau en dépensant SES fragments. */
     @Transactional
     public UpgradeResponse upgrade(String userId, String cardPublicId) {
-        PlayerWallet wallet = lockWallet(userId); // verrou global du joueur
+        PlayerWallet wallet = lockWallet(userId);
         PlayerCard pc = getPlayerCard(userId, cardPublicId);
         Integer cost = GameRules.nextUpgradeCost(pc.getLevel());
         if (cost == null) {
@@ -135,11 +123,11 @@ public class PlayerCollectionService {
         pc.setFragments(pc.getFragments() - cost);
         pc.setLevel(pc.getLevel() + 1);
         boolean playerLevelUp = addXp(wallet, GameRules.XP_CARD_UPGRADE);
+        List<String> newAch = achievementService.checkAndUnlock(userId, wallet);
         return new UpgradeResponse(pc.getLevel(), pc.getFragments(), GameRules.nextUpgradeCost(pc.getLevel()),
-            GameRules.XP_CARD_UPGRADE, playerLevelUp, progressOf(wallet));
+            GameRules.XP_CARD_UPGRADE, playerLevelUp, progressOf(wallet), newAch);
     }
 
-    // ---------- Boutique (pièces) ----------
 
     @Transactional(readOnly = true)
     public List<ShopItemResponse> shop(String userId, String lang) {
@@ -167,17 +155,10 @@ public class PlayerCollectionService {
         }
         wallet.setCoins(wallet.getCoins() - art.getCoinPrice());
         grantArt(userId, art);
-        return toResponse(wallet);
+        List<String> newAch = achievementService.checkAndUnlock(userId, wallet);
+        return toResponse(wallet, newAch);
     }
 
-    // ---------- Attribution ----------
-
-    /**
-     * Donne une illustration au joueur.
-     * - déjà possédée (doublon) : les fragments vont sur le saint concerné
-     * - nouveau saint : création du PlayerCard + illustration par défaut offerte
-     * Le retour décrit l'état du saint après attribution.
-     */
     @Transactional
     public GrantResult grantArt(String userId, CardArt art) {
         UUID cardId = art.getCard().getId();

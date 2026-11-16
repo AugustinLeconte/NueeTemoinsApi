@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.nueetemoins.backend.achievement.AchievementService;
 import com.nueetemoins.backend.card.ArtSource;
 import com.nueetemoins.backend.card.Card;
 import com.nueetemoins.backend.card.CardArt;
@@ -28,11 +29,6 @@ import com.nueetemoins.backend.player.dto.PackResult;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Chaque emplacement du pack est soit des pièces, soit une illustration.
- * Illustration : tirage en 2 étapes (1) un saint, boosté le jour de sa fête ; (2) une illustration selon la rareté.
- * Garanties : un pack contient toujours au moins une carte, et le slot "pity" est toujours une carte.
- */
 @Service
 @RequiredArgsConstructor
 public class PackService {
@@ -43,10 +39,10 @@ public class PackService {
     private final CardArtRepository artRepository;
     private final PlayerCollectionService collection;
     private final CardArtService cardArtService;
+    private final AchievementService achievements;
 
     private final Random random = new SecureRandom();
 
-    /** Pack quotidien gratuit (1 par jour, fuseau Europe/Paris). */
     @Transactional
     public PackResult openDaily(String userId, String lang, String country) {
         PlayerWallet wallet = collection.lockWallet(userId);
@@ -58,7 +54,6 @@ public class PackService {
         return open(userId, wallet, PackType.STANDARD, lang, country);
     }
 
-    /** Point d'entrée réutilisable (pack acheté, offert par un événement...). */
     @Transactional
     public PackResult open(String userId, PlayerWallet wallet, PackType type, String lang, String country) {
         List<CardArt> pool = artRepository.findPackPool(POOL_SOURCES);
@@ -82,7 +77,6 @@ public class PackService {
             boolean pitySlot = pityActive && !gotRare && last;
             boolean mustBeCard = pitySlot || (last && cardsDrawn == 0);
 
-            // --- emplacement "pièces" ---
             if (!mustBeCard && random.nextInt(100) < type.coinChancePercent) {
                 int amount = type.coinMin + random.nextInt(type.coinMax - type.coinMin + 1);
                 wallet.setCoins(wallet.getCoins() + amount);
@@ -91,7 +85,7 @@ public class PackService {
                 continue;
             }
 
-            // --- emplacement "carte" ---
+
             CardRarity min = pitySlot ? GameRules.PITY_MIN : CardRarity.COMMON;
             CardRarity target = rollRarity(type, min);
             CardArt art = pickArt(byCard, target, min, country);
@@ -110,11 +104,10 @@ public class PackService {
         int xpGained = GameRules.XP_PACK_OPENED
             + newCards * GameRules.XP_NEW_CARD + newArts * GameRules.XP_NEW_ART;
         collection.addXp(wallet, xpGained);
+        List<String> newAchievements = achievements.checkAndUnlock(userId, wallet);
         return new PackResult(type.name(), draws, coinsTotal, wallet.getCoins(), wallet.getPacksSinceRare(),
-            xpGained, levelBefore, collection.progressOf(wallet));
+            xpGained, levelBefore, collection.progressOf(wallet), newAchievements);
     }
-
-    // ---------- Algorithme ----------
 
     private CardRarity rollRarity(PackType type, CardRarity min) {
         List<CardRarity> candidates = new ArrayList<>();

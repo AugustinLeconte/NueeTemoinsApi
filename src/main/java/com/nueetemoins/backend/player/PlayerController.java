@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nueetemoins.backend.achievement.dto.AchievementResponse;
 import com.nueetemoins.backend.player.dto.EquipRequest;
 import com.nueetemoins.backend.player.dto.PackOfferResponse;
 import com.nueetemoins.backend.player.dto.PackResult;
@@ -100,5 +101,11 @@ public class PlayerController {
     public PackResult openLevelPack(@RequestAttribute("userId") String userId, @PathVariable int level) {
         var p = profileService.require(userId);
         return progressService.openLevelPack(userId, level, p.language(), p.country());
+    }
+
+    @GetMapping("/achievements")
+    public List<AchievementResponse> achievements(@RequestAttribute("userId") String userId) {
+        profileService.require(userId);
+        return progressService.achievements(userId);
     }
 }

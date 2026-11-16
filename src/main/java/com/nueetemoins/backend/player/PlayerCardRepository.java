@@ -18,4 +18,6 @@ public interface PlayerCardRepository extends JpaRepository<PlayerCard, UUID> {
     Optional<PlayerCard> findByUserIdAndCardId(String userId, UUID cardId);
 
     boolean existsByCardId(UUID cardId);
+
+    long countByUserId(String userId);
 }

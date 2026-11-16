@@ -1,3 +1,5 @@
 package com.nueetemoins.backend.player.dto;
 
-public record WalletResponse(int coins, int packsSinceRare, boolean dailyPackAvailable) {}
+import java.util.List;
+
+public record WalletResponse(int coins, int packsSinceRare, boolean dailyPackAvailable, List<String> newAchievements) {}

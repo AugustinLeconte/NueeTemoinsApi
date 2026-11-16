@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.nueetemoins.backend.card.ArtSource;
+
 public interface PlayerArtRepository extends JpaRepository<PlayerArt, UUID> {
 
     @EntityGraph(attributePaths = {"art", "art.card"})
@@ -20,4 +22,10 @@ public interface PlayerArtRepository extends JpaRepository<PlayerArt, UUID> {
 
     @Query("select pa.art.id from PlayerArt pa where pa.userId = :userId")
     Set<UUID> findOwnedArtIds(@Param("userId") String userId);
+
+    @Query("select count(pa) from PlayerArt pa where pa.userId = :userId group by pa.art.card.id")
+    List<Long> countArtsPerCard(@Param("userId") String userId);
+    
+    @Query("select count(pa) from PlayerArt pa where pa.userId = :userId and pa.art.source = :source")
+    long countByUserIdAndArtSource(@Param("userId") String userId, @Param("source") ArtSource source);
 }

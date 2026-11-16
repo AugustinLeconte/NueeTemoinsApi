@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.nueetemoins.backend.achievement.AchievementService;
+import com.nueetemoins.backend.achievement.dto.AchievementResponse;
 import com.nueetemoins.backend.player.dto.PackOfferResponse;
 import com.nueetemoins.backend.player.dto.PackOfferStatus;
 import com.nueetemoins.backend.player.dto.PackResult;
@@ -16,32 +18,28 @@ import com.nueetemoins.backend.player.dto.ProgressResponse;
 
 import lombok.RequiredArgsConstructor;
 
-/** Niveau / XP du joueur et packs débloqués par les passages de niveau. */
 @Service
 @RequiredArgsConstructor
 public class PlayerProgressService {
 
-    /** Nombre de packs verrouillés affichés à l'avance dans la boutique. */
     private static final int PREVIEW_LEVELS = 3;
 
     private final PlayerCollectionService collection;
     private final PlayerPackClaimRepository claimRepository;
     private final PackService packService;
+    private final AchievementService achievementService;
 
     @Transactional
     public ProgressResponse progress(String userId) {
         return collection.progressOf(collection.lockWallet(userId));
     }
 
-    /**
-     * Point d'entrée pour les futurs jeux / activités : donne de l'XP à un joueur.
-     * À appeler UNIQUEMENT depuis le serveur, jamais avec un montant fourni par le client.
-     */
     @Transactional
     public ProgressResponse awardXp(String userId, int amount) {
         if (amount <= 0) throw new IllegalArgumentException("amount must be positive");
         PlayerWallet wallet = collection.lockWallet(userId);
         collection.addXp(wallet, amount);
+        achievementService.checkAndUnlock(userId, wallet);
         return collection.progressOf(wallet);
     }
 
@@ -62,7 +60,6 @@ public class PlayerProgressService {
         return offers;
     }
 
-    /** Ouvre le pack débloqué au niveau `level` (une seule fois par joueur et par niveau). */
     @Transactional
     public PackResult openLevelPack(String userId, int level, String lang, String country) {
         PlayerWallet wallet = collection.lockWallet(userId);
@@ -79,5 +76,11 @@ public class PlayerProgressService {
         claimRepository.save(claim);
 
         return packService.open(userId, wallet, GameRules.levelPackType(level), lang, country);
+    }
+
+    @Transactional
+    public List<AchievementResponse> achievements(String userId) {
+        PlayerWallet wallet = collection.lockWallet(userId);
+        return achievementService.list(userId, wallet);
     }
 }
