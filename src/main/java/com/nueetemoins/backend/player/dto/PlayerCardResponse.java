@@ -8,7 +8,8 @@ import com.nueetemoins.backend.card.dto.CardResponse;
 public record PlayerCardResponse(
     CardResponse card,
     int level,
+    int fragments,             // fragments de ce saint
     CardArtResponse equippedArt,
     List<CardArtResponse> ownedArts,
-    Integer nextUpgradeCost // null si niveau max
+    Integer nextUpgradeCost    // null si niveau max
 ) {}

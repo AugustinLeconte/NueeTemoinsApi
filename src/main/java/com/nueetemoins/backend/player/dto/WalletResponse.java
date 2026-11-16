@@ -1,3 +1,3 @@
 package com.nueetemoins.backend.player.dto;
 
-public record WalletResponse(int fragments, int packsSinceRare, boolean dailyPackAvailable) {}
+public record WalletResponse(int coins, int packsSinceRare, boolean dailyPackAvailable) {}

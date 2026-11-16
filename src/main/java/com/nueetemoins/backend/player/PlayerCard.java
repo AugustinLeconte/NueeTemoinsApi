@@ -40,6 +40,10 @@ public class PlayerCard {
     @Column(nullable = false)
     private int level = 1;
 
+    /** Fragments de CE saint (obtenus via les doublons de ses illustrations). */
+    @Column(nullable = false)
+    private int fragments = 0;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "equipped_art_id")
     private CardArt equippedArt;

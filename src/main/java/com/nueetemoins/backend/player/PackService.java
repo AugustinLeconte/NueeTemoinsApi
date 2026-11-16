@@ -23,14 +23,15 @@ import com.nueetemoins.backend.card.CardArt;
 import com.nueetemoins.backend.card.CardArtRepository;
 import com.nueetemoins.backend.card.CardArtService;
 import com.nueetemoins.backend.card.CardRarity;
-import com.nueetemoins.backend.player.dto.DrawnArt;
+import com.nueetemoins.backend.player.dto.DrawnItem;
 import com.nueetemoins.backend.player.dto.PackResult;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Tirage en 2 étapes : 1) un saint (poids 1, boosté le jour de sa fête)
- *                      2) une illustration de ce saint selon la rareté tirée.
+ * Chaque emplacement du pack est soit des pièces, soit une illustration.
+ * Illustration : tirage en 2 étapes (1) un saint, boosté le jour de sa fête ; (2) une illustration selon la rareté.
+ * Garanties : un pack contient toujours au moins une carte, et le slot "pity" est toujours une carte.
  */
 @Service
 @RequiredArgsConstructor
@@ -69,27 +70,40 @@ public class PackService {
 
         boolean pityActive = wallet.getPacksSinceRare() >= GameRules.PITY_THRESHOLD;
         boolean gotRare = false;
-        int totalFragments = 0;
-        List<DrawnArt> draws = new ArrayList<>();
+        int cardsDrawn = 0;
+        int coinsTotal = 0;
+        List<DrawnItem> draws = new ArrayList<>();
 
         for (int i = 0; i < type.size; i++) {
-            CardRarity min = CardRarity.COMMON;
-            if (pityActive && !gotRare && i == type.size - 1) {
-                min = GameRules.PITY_MIN; // dernier slot garanti
+            boolean last = i == type.size - 1;
+            boolean pitySlot = pityActive && !gotRare && last;
+            boolean mustBeCard = pitySlot || (last && cardsDrawn == 0);
+
+            // --- emplacement "pièces" ---
+            if (!mustBeCard && random.nextInt(100) < type.coinChancePercent) {
+                int amount = type.coinMin + random.nextInt(type.coinMax - type.coinMin + 1);
+                wallet.setCoins(wallet.getCoins() + amount);
+                coinsTotal += amount;
+                draws.add(DrawnItem.ofCoins(amount));
+                continue;
             }
+
+            // --- emplacement "carte" ---
+            CardRarity min = pitySlot ? GameRules.PITY_MIN : CardRarity.COMMON;
             CardRarity target = rollRarity(type, min);
             CardArt art = pickArt(byCard, target, min, country);
             if (art.getRarity().ordinal() >= GameRules.PITY_MIN.ordinal()) {
                 gotRare = true;
             }
-            GrantResult g = collection.grantArt(userId, wallet, art);
-            totalFragments += g.fragmentsGained();
-            draws.add(new DrawnArt(cardArtService.toResponse(art, lang),
-                g.newArt(), g.newCard(), g.fragmentsGained()));
+            GrantResult g = collection.grantArt(userId, art);
+            cardsDrawn++;
+            draws.add(DrawnItem.ofArt(cardArtService.toResponse(art, lang),
+                g.newArt(), g.newCard(), g.fragmentsGained(),
+                g.cardFragments(), g.cardLevel(), g.nextUpgradeCost()));
         }
 
         wallet.setPacksSinceRare(gotRare ? 0 : wallet.getPacksSinceRare() + 1);
-        return new PackResult(draws, totalFragments, wallet.getFragments(), wallet.getPacksSinceRare());
+        return new PackResult(draws, coinsTotal, wallet.getCoins(), wallet.getPacksSinceRare());
     }
 
     // ---------- Algorithme ----------
@@ -103,13 +117,11 @@ public class PackService {
     }
 
     private CardArt pickArt(Map<UUID, List<CardArt>> byCard, CardRarity target, CardRarity min, String country) {
-        // 1) le saint : uniquement ceux ayant au moins une illustration >= min
         List<List<CardArt>> saints = byCard.values().stream()
             .filter(arts -> arts.stream().anyMatch(a -> a.getRarity().ordinal() >= min.ordinal()))
             .toList();
         List<CardArt> arts = weighted(saints, l -> saintWeight(l.get(0).getCard(), country));
 
-        // 2) l'illustration : rareté cible, sinon la plus proche en descendant jusqu'à min, puis en montant
         for (CardRarity r : searchOrder(target, min)) {
             List<CardArt> sameRarity = arts.stream().filter(a -> a.getRarity() == r).toList();
             if (!sameRarity.isEmpty()) {

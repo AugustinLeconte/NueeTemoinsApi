@@ -17,7 +17,7 @@ public record CardArtRequest(
     @NotNull ArtSource source,
     @NotBlank String imageUrl,
     @Min(0) Integer dropWeight,
-    @Min(1) Integer fragmentPrice,
+    @Min(1) Integer coinPrice,
     Boolean obtainable,
     @Valid List<ArtTranslationRequest> translations
 ) {}

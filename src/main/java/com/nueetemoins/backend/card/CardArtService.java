@@ -51,7 +51,7 @@ public class CardArtService {
         return new CardArtRequest(
             a.getArtist() == null ? null : a.getArtist().getPublicId(),
             a.getRarity(), a.getSource(), a.getImageUrl(),
-            a.getDropWeight(), a.getFragmentPrice(), a.isObtainable(),
+            a.getDropWeight(), a.getCoinPrice(), a.isObtainable(),
             a.getTranslations().stream()
                 .map(t -> new ArtTranslationRequest(t.getLocale(), t.getTitle(), t.getDescription()))
                 .toList());
@@ -106,14 +106,14 @@ public class CardArtService {
         return new CardArtResponse(
             a.getPublicId(), card.getPublicId(), cardTitle,
             artist == null ? null : ArtistResponse.from(artist),
-            a.getRarity(), a.getSource(), a.getImageUrl(), a.getFragmentPrice(),
+            a.getRarity(), a.getSource(), a.getImageUrl(), a.getCoinPrice(),
             t == null ? null : t.getTitle(),
             t == null ? null : t.getDescription());
     }
 
     private void apply(CardArt art, CardArtRequest req) {
-        if (req.source() == ArtSource.SHOP && req.fragmentPrice() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "fragmentPrice is required for SHOP arts");
+        if (req.source() == ArtSource.SHOP && req.coinPrice() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "coinPrice is required for SHOP arts");
         }
         if (req.source() == ArtSource.DEFAULT) {
             if (req.rarity() != CardRarity.COMMON) {
@@ -137,7 +137,7 @@ public class CardArtService {
         art.setSource(req.source());
         art.setImageUrl(req.imageUrl());
         art.setDropWeight(req.dropWeight() == null ? 100 : req.dropWeight());
-        art.setFragmentPrice(req.source() == ArtSource.SHOP ? req.fragmentPrice() : null);
+        art.setCoinPrice(req.source() == ArtSource.SHOP ? req.coinPrice() : null);
         art.setObtainable(req.obtainable() == null || req.obtainable());
 
         List<ArtTranslationRequest> trs = req.translations() == null ? List.of() : req.translations();

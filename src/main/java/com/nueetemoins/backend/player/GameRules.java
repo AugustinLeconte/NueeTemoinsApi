@@ -13,7 +13,7 @@ final class GameRules {
     /** Multiplicateur de probabilité du saint fêté le jour même. */
     static final int FEAST_BOOST = 5;
 
-    /** Fragments gagnés quand on tire une illustration déjà possédée. */
+    /** Fragments du saint gagnés quand on tire une de ses illustrations déjà possédée. */
     static int duplicateFragments(CardRarity r) {
         return switch (r) {
             case COMMON -> 5;
@@ -24,6 +24,11 @@ final class GameRules {
         };
     }
 
-    /** Coût pour passer de `level` à `level + 1`. */
-    static int upgradeCost(int level) { return level * 50; }
+    /** Coût (en fragments du saint) pour passer du niveau n au niveau n+1 : index = n - 1. */
+    private static final int[] UPGRADE_COSTS = {20, 50, 100, 200};
+
+    /** Coût du prochain niveau, ou null si le niveau maximum est atteint. */
+    static Integer nextUpgradeCost(int level) {
+        return level >= MAX_LEVEL ? null : UPGRADE_COSTS[level - 1];
+    }
 }

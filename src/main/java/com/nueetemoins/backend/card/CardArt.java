@@ -59,9 +59,9 @@ public class CardArt {
     @Column(name = "drop_weight", nullable = false)
     private int dropWeight = 100;
 
-    /** Prix en fragments (uniquement pour source = SHOP). */
-    @Column(name = "fragment_price")
-    private Integer fragmentPrice;
+    /** Prix en pièces (uniquement pour source = SHOP). */
+    @Column(name = "coin_price")
+    private Integer coinPrice;
 
     /** Permet de retirer une illustration des packs/boutique sans la supprimer. */
     @Column(nullable = false)

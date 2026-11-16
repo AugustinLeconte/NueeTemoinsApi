@@ -19,7 +19,9 @@ public class PlayerWallet {
     @Column(name = "user_id")
     private String userId;
 
-    private int fragments;
+    /** Pièces : gagnées dans les packs, dépensées en boutique. */
+    @Column(nullable = false)
+    private int coins;
 
     /** Pity : nombre de packs consécutifs sans illustration RARE+. */
     @Column(name = "packs_since_rare", nullable = false)

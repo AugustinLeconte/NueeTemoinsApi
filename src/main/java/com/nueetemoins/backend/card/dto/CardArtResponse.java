@@ -11,7 +11,7 @@ public record CardArtResponse(
     CardRarity rarity,
     ArtSource source,
     String imageUrl,
-    Integer fragmentPrice,
+    Integer coinPrice,
     String title,
     String description
 ) {}
