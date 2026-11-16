@@ -1,5 +1,6 @@
 package com.nueetemoins.backend.player;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 import jakarta.persistence.Column;
@@ -19,18 +20,27 @@ public class PlayerWallet {
     @Column(name = "user_id")
     private String userId;
 
-    /** Pièces : gagnées dans les packs, dépensées en boutique. */
     @Column(nullable = false)
     private int coins;
 
-    /** Expérience totale du joueur (le niveau en est déduit, cf. GameRules). */
     @Column(nullable = false)
     private int xp;
 
-    /** Pity : nombre de packs consécutifs sans illustration RARE+. */
     @Column(name = "packs_since_rare", nullable = false)
     private int packsSinceRare;
 
     @Column(name = "last_daily_pack")
     private LocalDate lastDailyPack;
+
+    @Column(name = "last_daily_coins")
+    private LocalDate lastDailyCoins;
+
+    @Column(name = "ad_rewards_date")
+    private LocalDate adRewardsDate;
+
+    @Column(name = "ad_rewards_count", nullable = false)
+    private int adRewardsCount;
+
+    @Column(name = "last_ad_reward_at")
+    private Instant lastAdRewardAt;
 }

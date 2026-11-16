@@ -49,6 +49,7 @@ public class AchievementService {
     }
 
     /** Liste complète (débloqués + progression des autres), pour l'écran des succès. */
+    @SuppressWarnings("null")
     @Transactional
     public List<AchievementResponse> list(String userId, PlayerWallet wallet) {
         checkAndUnlock(userId, wallet); // rattrape aussi les joueurs existants
@@ -67,6 +68,7 @@ public class AchievementService {
         return out;
     }
 
+    @SuppressWarnings("null")
     private int metricValue(AchievementMetric metric, String userId, PlayerWallet wallet) {
         return switch (metric) {
             case PLAYER_LEVEL -> GameRules.levelForXp(wallet.getXp());

@@ -1,4 +1,4 @@
-package com.nueetemoins.backend.player.dto;
+package com.nueetemoins.backend.shop.dto;
 
 import com.nueetemoins.backend.card.dto.CardArtResponse;
 

@@ -19,10 +19,10 @@ import com.nueetemoins.backend.player.dto.PackOfferResponse;
 import com.nueetemoins.backend.player.dto.PackResult;
 import com.nueetemoins.backend.player.dto.PlayerCardResponse;
 import com.nueetemoins.backend.player.dto.ProgressResponse;
-import com.nueetemoins.backend.player.dto.ShopItemResponse;
 import com.nueetemoins.backend.player.dto.UpgradeResponse;
 import com.nueetemoins.backend.player.dto.WalletResponse;
 import com.nueetemoins.backend.profile.ProfileService;
+import com.nueetemoins.backend.shop.dto.ShopItemResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -68,19 +68,6 @@ public class PlayerController {
     public PackResult openDaily(@RequestAttribute("userId") String userId) {
         var p = profileService.require(userId);
         return packService.openDaily(userId, p.language(), p.country());
-    }
-
-    @GetMapping("/shop")
-    public List<ShopItemResponse> shop(@RequestAttribute("userId") String userId) {
-        var p = profileService.require(userId);
-        return collectionService.shop(userId, p.language());
-    }
-
-    @PostMapping("/shop/arts/{artPublicId}/buy")
-    public WalletResponse buy(@RequestAttribute("userId") String userId,
-                              @PathVariable String artPublicId) {
-        profileService.require(userId);
-        return collectionService.buy(userId, artPublicId);
     }
 
     // ---------- Niveau du joueur & packs de niveau ----------

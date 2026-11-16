@@ -22,9 +22,9 @@ import com.nueetemoins.backend.card.CardArtService;
 import com.nueetemoins.backend.card.CardService;
 import com.nueetemoins.backend.player.dto.PlayerCardResponse;
 import com.nueetemoins.backend.player.dto.ProgressResponse;
-import com.nueetemoins.backend.player.dto.ShopItemResponse;
 import com.nueetemoins.backend.player.dto.UpgradeResponse;
 import com.nueetemoins.backend.player.dto.WalletResponse;
+import com.nueetemoins.backend.shop.dto.ShopItemResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -32,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PlayerCollectionService {
 
-    static final ZoneId ZONE = ZoneId.of("Europe/Paris");
+    public static final ZoneId ZONE = ZoneId.of("Europe/Paris");
 
     private final PlayerWalletRepository walletRepository;
     private final PlayerCardRepository playerCardRepository;
@@ -57,7 +57,7 @@ public class PlayerCollectionService {
         return toResponse(lockWallet(userId), List.of());
     }
 
-    WalletResponse toResponse(PlayerWallet w, List<String> newAchievements) {
+    public WalletResponse toResponse(PlayerWallet w, List<String> newAchievements) {
         boolean available = !LocalDate.now(ZONE).equals(w.getLastDailyPack());
         return new WalletResponse(w.getCoins(), w.getPacksSinceRare(), available, newAchievements);
     }
@@ -128,36 +128,6 @@ public class PlayerCollectionService {
             GameRules.XP_CARD_UPGRADE, playerLevelUp, progressOf(wallet), newAch);
     }
 
-
-    @Transactional(readOnly = true)
-    public List<ShopItemResponse> shop(String userId, String lang) {
-        Set<UUID> owned = playerArtRepository.findOwnedArtIds(userId);
-        return cardArtRepository.findBySourceWithCard(ArtSource.SHOP).stream()
-            .filter(a -> a.getCoinPrice() != null)
-            .map(a -> new ShopItemResponse(
-                cardArtService.toResponse(a, lang), a.getCoinPrice(), owned.contains(a.getId())))
-            .toList();
-    }
-
-    @Transactional
-    public WalletResponse buy(String userId, String artPublicId) {
-        CardArt art = cardArtRepository.findByPublicId(artPublicId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Art not found"));
-        if (art.getSource() != ArtSource.SHOP || !art.isObtainable() || art.getCoinPrice() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Art is not for sale");
-        }
-        PlayerWallet wallet = lockWallet(userId);
-        if (playerArtRepository.existsByUserIdAndArtId(userId, art.getId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Art already owned");
-        }
-        if (wallet.getCoins() < art.getCoinPrice()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Not enough coins");
-        }
-        wallet.setCoins(wallet.getCoins() - art.getCoinPrice());
-        grantArt(userId, art);
-        List<String> newAch = achievementService.checkAndUnlock(userId, wallet);
-        return toResponse(wallet, newAch);
-    }
 
     @Transactional
     public GrantResult grantArt(String userId, CardArt art) {

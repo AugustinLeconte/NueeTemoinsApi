@@ -13,7 +13,6 @@ public enum PackType {
 
     final int size;
     private final int[] weights;
-    /** Chance (en %) qu'un emplacement contienne des pièces au lieu d'une carte. */
     final int coinChancePercent;
     final int coinMin;
     final int coinMax;

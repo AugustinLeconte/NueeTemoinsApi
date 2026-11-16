@@ -117,6 +117,7 @@ public class PackService {
         return weighted(candidates, type::weightOf);
     }
 
+    @SuppressWarnings("null")
     private CardArt pickArt(Map<UUID, List<CardArt>> byCard, CardRarity target, CardRarity min, String country) {
         List<List<CardArt>> saints = byCard.values().stream()
             .filter(arts -> arts.stream().anyMatch(a -> a.getRarity().ordinal() >= min.ordinal()))
