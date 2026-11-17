@@ -22,8 +22,9 @@ public class ProfileController {
     public ResponseEntity<?> create(@RequestAttribute("userId") String userId,
                                     @RequestBody ProfileRequest p) {
         try {
+            String pseudo = p.pseudo().replaceAll("[\\s\\u00A0]+", " ").trim();
             jdbc.update("INSERT INTO profiles (user_id, pseudo, country, language) VALUES (?,?,?,?)",
-                        userId, p.pseudo(), p.country(), p.language());
+                        userId, pseudo, p.country(), p.language());
             return ResponseEntity.ok().build();
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(409).body("Pseudo déjà pris");
