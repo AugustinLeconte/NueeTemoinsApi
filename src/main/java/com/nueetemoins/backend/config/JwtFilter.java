@@ -24,7 +24,14 @@ public class JwtFilter extends OncePerRequestFilter {
             res.sendError(401); return;
         }
         try {
-            String userId = verifier.verify(header.substring(7));
+            String userId;
+            try {
+                userId = verifier.verify(header.substring(7));
+            } catch (Exception e) {
+                logger.warn("JWT refusé : " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                res.sendError(401);
+                return;
+            }
             req.setAttribute("userId", userId);
             chain.doFilter(req, res);
         } catch (Exception e) {

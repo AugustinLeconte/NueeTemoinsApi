@@ -1,5 +1,6 @@
 package com.nueetemoins.backend.player;
 
+import java.time.ZoneId;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -7,6 +8,11 @@ import com.nueetemoins.backend.card.CardRarity;
 
 public final class GameRules {
     private GameRules() {}
+
+    public static final ZoneId GAME_ZONE = ZoneId.of("Europe/Paris");
+    public static final int XP_MINIGAME_MIN = 5;
+
+    private static final int[] WORDLE_WIN_XP = {50, 30, 25, 20, 15, 10};
 
     public static final int MAX_LEVEL = 5;
     public static final int PITY_THRESHOLD = 10;
@@ -67,5 +73,11 @@ public final class GameRules {
 
     static Integer nextUpgradeCost(int level) {
         return level >= MAX_LEVEL ? null : UPGRADE_COSTS[level - 1];
+    }
+
+    public static int wordleXp(boolean won, int attempts) {
+        if (!won) return XP_MINIGAME_MIN;
+        int i = Math.min(Math.max(attempts, 1), WORDLE_WIN_XP.length) - 1;
+        return Math.max(XP_MINIGAME_MIN, WORDLE_WIN_XP[i]);
     }
 }

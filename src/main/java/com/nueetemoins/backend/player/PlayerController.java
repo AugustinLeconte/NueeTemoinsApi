@@ -22,7 +22,6 @@ import com.nueetemoins.backend.player.dto.ProgressResponse;
 import com.nueetemoins.backend.player.dto.UpgradeResponse;
 import com.nueetemoins.backend.player.dto.WalletResponse;
 import com.nueetemoins.backend.profile.ProfileService;
-import com.nueetemoins.backend.shop.dto.ShopItemResponse;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

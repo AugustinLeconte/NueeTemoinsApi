@@ -1,6 +1,7 @@
 package com.nueetemoins.backend.achievement;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nueetemoins.backend.card.ArtSource;
+import com.nueetemoins.backend.minigame.MiniGameResultRepository;
 import com.nueetemoins.backend.player.GameRules;
 import com.nueetemoins.backend.player.PlayerArtRepository;
 import com.nueetemoins.backend.player.PlayerCardRepository;
@@ -27,6 +29,7 @@ public class AchievementService {
     private final PlayerAchievementRepository achievementRepository;
     private final PlayerCardRepository playerCardRepository;
     private final PlayerArtRepository playerArtRepository;
+    private final MiniGameResultRepository miniGameResultRepository;
 
     @Transactional
     public List<String> checkAndUnlock(String userId, PlayerWallet wallet) {
@@ -68,7 +71,15 @@ public class AchievementService {
         return out;
     }
 
-    @SuppressWarnings("null")
+    private int currentStreak(String userId) {
+        List<LocalDate> days = miniGameResultRepository.findPlayedDays(userId); // du + récent au + ancien
+        LocalDate today = LocalDate.now(GameRules.GAME_ZONE);
+        if (days.isEmpty() || days.get(0).isBefore(today.minusDays(1))) return 0;
+        int streak = 1;
+        for (int i = 1; i < days.size() && days.get(i).equals(days.get(i - 1).minusDays(1)); i++) streak++;
+        return streak;
+    }
+
     private int metricValue(AchievementMetric metric, String userId, PlayerWallet wallet) {
         return switch (metric) {
             case PLAYER_LEVEL -> GameRules.levelForXp(wallet.getXp());
@@ -77,6 +88,10 @@ public class AchievementService {
                 .mapToInt(Long::intValue).max().orElse(0);
             case COINS -> wallet.getCoins();
             case SHOP_PURCHASES -> (int) playerArtRepository.countByUserIdAndArtSource(userId, ArtSource.SHOP);
+            case MINIGAME_WINS -> (int) miniGameResultRepository.countByUserIdAndWonTrue(userId);
+            case MINIGAME_PERFECT_WINS -> (int) miniGameResultRepository.countByUserIdAndPerfectTrue(userId);
+            case MINIGAME_DISTINCT_GAMES_WON -> (int) miniGameResultRepository.countDistinctGamesWon(userId);
+            case MINIGAME_STREAK -> currentStreak(userId);
         };
     }
 }
