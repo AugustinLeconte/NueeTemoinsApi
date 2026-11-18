@@ -1,7 +1,6 @@
 package com.nueetemoins.backend.minigame.wordle;
 
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.web.bind.annotation.*;
 

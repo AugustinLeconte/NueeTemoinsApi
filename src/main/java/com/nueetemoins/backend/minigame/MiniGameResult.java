@@ -11,10 +11,16 @@ import lombok.Setter;
 
 /**
  * Résultat générique d'une partie terminée, quel que soit le mini-jeu.
- * C'est CETTE table qui sert aux succès (pas les tables propres à chaque jeu).
+ * C'est CETTE table qui sert aux succès ET aux classements du jour.
+ * Nouveautés : durationMs + attempts (pour départager / afficher) et une partie max par jour/jeu/joueur.
  */
 @Entity
-@Table(name = "minigame_results", indexes = @Index(columnList = "user_id"))
+@Table(name = "minigame_results",
+    indexes = {
+        @Index(columnList = "user_id"),
+        @Index(columnList = "game, played_on")
+    },
+    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "game", "played_on"}))
 @Getter @Setter @NoArgsConstructor
 public class MiniGameResult {
 
@@ -35,12 +41,19 @@ public class MiniGameResult {
     @Column(nullable = false)
     private boolean won;
 
-    /** Meilleur résultat possible du jeu (ex. Wordle trouvé du premier coup). */
+    /** Meilleur résultat possible du jeu (ex. Wordle du premier coup, Memory sans erreur). */
     @Column(nullable = false)
     private boolean perfect;
 
     @Column(nullable = false)
     private int xp;
+
+    /** Temps de jeu "actif" en ms (null pour les anciens résultats Wordle). */
+    @Column(name = "duration_ms")
+    private Long durationMs;
+
+    /** Essais / coups utilisés (sens propre à chaque jeu). */
+    private Integer attempts;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
