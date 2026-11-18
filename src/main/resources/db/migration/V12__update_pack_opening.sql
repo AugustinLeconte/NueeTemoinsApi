@@ -1,0 +1,1 @@
+ALTER TABLE player_pack_claims ADD COLUMN opened boolean NOT NULL DEFAULT true;

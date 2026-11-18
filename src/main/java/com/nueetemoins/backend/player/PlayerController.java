@@ -89,6 +89,13 @@ public class PlayerController {
         return progressService.openLevelPack(userId, level, p.language(), p.country());
     }
 
+    @PostMapping("/shop/packs/{level}/claim")
+    public List<PackOfferResponse> claimLevelPack(@RequestAttribute("userId") String userId,
+                                                @PathVariable int level) {
+        profileService.require(userId);
+        return progressService.claimLevelPack(userId, level);
+    }
+
     @GetMapping("/achievements")
     public List<AchievementResponse> achievements(@RequestAttribute("userId") String userId) {
         profileService.require(userId);

@@ -14,7 +14,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Pack de niveau déjà ouvert par un joueur. */
 @Entity
 @Table(name = "player_pack_claims",
        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "level"}))
@@ -24,6 +23,9 @@ public class PlayerPackClaim {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "opened", nullable = false)
+    private boolean opened;
 
     @Column(name = "user_id", nullable = false)
     private String userId;

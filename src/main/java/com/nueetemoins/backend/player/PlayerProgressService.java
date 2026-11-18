@@ -44,43 +44,61 @@ public class PlayerProgressService {
     }
 
     @Transactional
+    public List<AchievementResponse> achievements(String userId) {
+        PlayerWallet wallet = collection.lockWallet(userId);
+        return achievementService.list(userId, wallet);
+    }
+
+    @Transactional
     public List<PackOfferResponse> packOffers(String userId) {
         PlayerWallet wallet = collection.lockWallet(userId);
         int level = GameRules.levelForXp(wallet.getXp());
-        Set<Integer> opened = claimRepository.findLevelsByUserId(userId);
+        Set<Integer> opened = claimRepository.findOpenedLevelsByUserId(userId);
+        Set<Integer> stored = claimRepository.findStoredLevelsByUserId(userId);
 
         List<PackOfferResponse> offers = new ArrayList<>();
         int last = Math.min(GameRules.MAX_PLAYER_LEVEL, level + PREVIEW_LEVELS);
         for (int l = 2; l <= last; l++) {
             PackType type = GameRules.levelPackType(l);
-            PackOfferStatus status = opened.contains(l) ? PackOfferStatus.OPENED
-                : l <= level ? PackOfferStatus.AVAILABLE : PackOfferStatus.LOCKED;
+            PackOfferStatus status =
+                opened.contains(l) ? PackOfferStatus.OPENED
+                : stored.contains(l) ? PackOfferStatus.CLAIMED
+                : l <= level         ? PackOfferStatus.AVAILABLE
+                :                      PackOfferStatus.LOCKED;
             offers.add(new PackOfferResponse(l, type.name(), type.size, status));
         }
         return offers;
     }
 
+    /** Boutique : met le pack de niveau en stock (sans l'ouvrir). */
     @Transactional
-    public PackResult openLevelPack(String userId, int level, String lang, String country) {
+    public List<PackOfferResponse> claimLevelPack(String userId, int level) {
         PlayerWallet wallet = collection.lockWallet(userId);
         int playerLevel = GameRules.levelForXp(wallet.getXp());
         if (level < 2 || level > playerLevel) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Pack not unlocked");
         }
         if (claimRepository.existsByUserIdAndLevel(userId, level)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pack already opened");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pack already claimed");
         }
         PlayerPackClaim claim = new PlayerPackClaim();
         claim.setUserId(userId);
         claim.setLevel(level);
+        claim.setOpened(false);
         claimRepository.save(claim);
-
-        return packService.open(userId, wallet, GameRules.levelPackType(level), lang, country);
+        return packOffers(userId);
     }
 
+    /** Page Packs : ouvre un pack précédemment récupéré. */
     @Transactional
-    public List<AchievementResponse> achievements(String userId) {
+    public PackResult openLevelPack(String userId, int level, String lang, String country) {
         PlayerWallet wallet = collection.lockWallet(userId);
-        return achievementService.list(userId, wallet);
+        PlayerPackClaim claim = claimRepository.findByUserIdAndLevel(userId, level)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Pack not claimed"));
+        if (claim.isOpened()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Pack already opened");
+        }
+        claim.setOpened(true);
+        return packService.open(userId, wallet, GameRules.levelPackType(level), lang, country);
     }
 }
