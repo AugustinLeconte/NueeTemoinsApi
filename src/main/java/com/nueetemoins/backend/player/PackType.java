@@ -7,7 +7,6 @@ import com.nueetemoins.backend.card.CardRarity;
  * et paramètres des emplacements "pièces".
  */
 public enum PackType {
-    //        taille  poids par rareté                  % pièces  min  max
     STANDARD(3, new int[] {700, 200, 80, 18, 2},        15,       20,  60),
     PREMIUM (5, new int[] {450, 300, 170, 65, 15},      15,       50, 150);
 

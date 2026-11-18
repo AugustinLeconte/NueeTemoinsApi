@@ -45,7 +45,7 @@ public class WordleGame {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "wordle_guesses", joinColumns = @JoinColumn(name = "game_id"))
     @OrderColumn(name = "idx")
-    @Column(name = "word", length = 5)
+    @Column(name = "word", length = 7) // 5, 6 ou 7 lettres : vérifie que la colonne en base fait bien >= 7
     private List<String> guesses = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
@@ -57,4 +57,11 @@ public class WordleGame {
 
     @Column(name = "finished_at")
     private Instant finishedAt;
+
+    /** Temps de jeu actif cumulé en ms (les pauses longues sont plafonnées, cf. WordleService). */
+    @Column(name = "active_ms", nullable = false)
+    private long activeMs;
+
+    @Column(name = "last_action_at", nullable = false)
+    private Instant lastActionAt = Instant.now();
 }

@@ -16,9 +16,9 @@ public final class WordleDto {
     /** `solution` n'est renseignée qu'une fois la partie terminée. */
     public record GameState(String lang, int wordLength, int maxAttempts,
                             WordleGame.Status status, List<GuessRow> guesses,
-                            String solution, int xpAwarded) {}
+                            String solution, int xpAwarded, long activeMs) {}
 
     public record GuessRequest(@NotBlank String guess) {}
 
-    public record LeaderboardEntry(int rank, String player, boolean won, int attempts, int xp) {}
+    public record LeaderboardEntry(int rank, String player, boolean won, int attempts, int xp, long activeMs) {}
 }

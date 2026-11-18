@@ -1,5 +1,6 @@
 package com.nueetemoins.backend.minigame.wordle;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -14,15 +15,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.nueetemoins.backend.minigame.MiniGameResult;
-import com.nueetemoins.backend.minigame.MiniGameResultRepository;
+import com.nueetemoins.backend.minigame.MiniGameResultService;
 import com.nueetemoins.backend.minigame.MiniGameType;
 import com.nueetemoins.backend.minigame.wordle.dto.WordleDto.GameState;
 import com.nueetemoins.backend.minigame.wordle.dto.WordleDto.GuessRow;
 import com.nueetemoins.backend.minigame.wordle.dto.WordleDto.LeaderboardEntry;
 import com.nueetemoins.backend.minigame.wordle.dto.WordleDto.LetterState;
 import com.nueetemoins.backend.player.GameRules;
-import com.nueetemoins.backend.player.PlayerProgressService;
 import com.nueetemoins.backend.profile.ProfileService;
 
 import lombok.RequiredArgsConstructor;
@@ -33,36 +32,31 @@ public class WordleService {
 
     public static final int MAX_ATTEMPTS = 6;
     private static final int LEADERBOARD_SIZE = 50;
+    /** Un écart plus long entre deux actions (onglet laissé ouvert) compte au maximum 60 s. */
+    private static final long MAX_GAP_MS = 60_000;
 
     private final WordleGameRepository games;
-    private final MiniGameResultRepository results;
+    private final MiniGameResultService results; // enregistre le résultat ET crédite l'XP
     private final WordBank bank;
-    private final PlayerProgressService progressService;
     private final ProfileService profiles;
 
     private static LocalDate today() {
         return LocalDate.now(GameRules.GAME_ZONE);
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Crée la partie dès l'ouverture de la page : le chrono démarre à ce moment-là
+     * (sinon le temps de réflexion avant le 1er mot ne serait pas compté).
+     */
+    @Transactional
     public GameState today(String userId, String lang) {
-        return games.findByUserIdAndGameDate(userId, today())
-            .map(this::toState)
-            .orElseGet(() -> new GameState(bank.resolveLang(lang), bank.lengthForDay(today()),
-                MAX_ATTEMPTS, WordleGame.Status.IN_PROGRESS, List.of(), null, 0));
+        return toState(loadOrCreate(userId, lang));
     }
 
     @Transactional
     public GameState guess(String userId, String lang, String rawGuess) {
         LocalDate day = today();
-        WordleGame game = games.findByUserIdAndGameDate(userId, day).orElseGet(() -> {
-            WordleGame g = new WordleGame();
-            g.setUserId(userId);
-            g.setGameDate(day);
-            g.setLang(bank.resolveLang(lang));
-            g.setWordLength(bank.lengthForDay(day));
-            return games.save(g);
-        });
+        WordleGame game = loadOrCreate(userId, lang);
 
         if (game.getStatus() != WordleGame.Status.IN_PROGRESS) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_FINISHED");
@@ -75,6 +69,7 @@ public class WordleService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "UNKNOWN_WORD");
         }
 
+        tick(game);
         game.getGuesses().add(word);
         String solution = bank.dailyWord(game.getLang(), game.getWordLength(), day);
         boolean won = word.equals(solution);
@@ -85,17 +80,10 @@ public class WordleService {
             game.setStatus(won ? WordleGame.Status.WON : WordleGame.Status.LOST);
             game.setXpAwarded(xp);
             game.setFinishedAt(Instant.now());
-
-            MiniGameResult r = new MiniGameResult();
-            r.setUserId(userId);
-            r.setGame(MiniGameType.WORDLE);
-            r.setPlayedOn(day);
-            r.setWon(won);
-            r.setPerfect(won && attempts == 1);
-            r.setXp(xp);
-            results.save(r); // doit être enregistré AVANT awardXp (qui vérifie les succès)
             games.save(game);
-            progressService.awardXp(userId, xp);
+            // enregistre le résultat puis crédite l'XP (et vérifie les succès), dans cet ordre
+            results.record(userId, MiniGameType.WORDLE, day, won, won && attempts == 1,
+                xp, game.getActiveMs(), attempts);
         } else {
             games.save(game);
         }
@@ -116,8 +104,29 @@ public class WordleService {
             WordleGame g = top.get(i);
             return new LeaderboardEntry(i + 1,
                 pseudos.getOrDefault(g.getUserId(), "?"),
-                g.getStatus() == WordleGame.Status.WON, g.getGuesses().size(), g.getXpAwarded());
+                g.getStatus() == WordleGame.Status.WON, g.getGuesses().size(), g.getXpAwarded(),
+                g.getActiveMs());
         }).toList();
+    }
+
+    private WordleGame loadOrCreate(String userId, String lang) {
+        LocalDate day = today();
+        return games.findByUserIdAndGameDate(userId, day).orElseGet(() -> {
+            WordleGame g = new WordleGame();
+            g.setUserId(userId);
+            g.setGameDate(day);
+            g.setLang(bank.resolveLang(lang));
+            g.setWordLength(bank.lengthForDay(day));
+            return games.save(g);
+        });
+    }
+
+    /** Ajoute le temps écoulé depuis la dernière action, plafonné pour ignorer les longues pauses. */
+    private static void tick(WordleGame g) {
+        Instant now = Instant.now();
+        long gap = Duration.between(g.getLastActionAt(), now).toMillis();
+        g.setActiveMs(g.getActiveMs() + Math.max(0, Math.min(gap, MAX_GAP_MS)));
+        g.setLastActionAt(now);
     }
 
     private GameState toState(WordleGame g) {
@@ -126,7 +135,7 @@ public class WordleService {
         List<GuessRow> rows = g.getGuesses().stream()
             .map(w -> new GuessRow(w, evaluate(w, solution))).toList();
         return new GameState(g.getLang(), g.getWordLength(), MAX_ATTEMPTS, g.getStatus(),
-            rows, finished ? solution : null, g.getXpAwarded());
+            rows, finished ? solution : null, g.getXpAwarded(), g.getActiveMs());
     }
 
     /** Algorithme Wordle standard (gère correctement les lettres en double). */
