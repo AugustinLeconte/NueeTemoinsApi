@@ -94,4 +94,14 @@ public class AchievementService {
             case MINIGAME_STREAK -> currentStreak(userId);
         };
     }
+
+    @Transactional(readOnly = true)
+    public List<AchievementResponse> unlockedOf(String userId) {
+        return achievementRepository.findByUserId(userId).stream()
+            .map(pa -> {
+                Achievement a = Achievement.valueOf(pa.getCode());
+                return new AchievementResponse(a.name(), true, pa.getUnlockedAt(), a.target, a.target);
+            })
+            .toList();
+    }
 }

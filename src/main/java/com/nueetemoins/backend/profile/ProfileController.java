@@ -1,22 +1,29 @@
 package com.nueetemoins.backend.profile;
 
-import java.util.List;
-
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nueetemoins.backend.profile.ProfileService.Info;
+
+import lombok.RequiredArgsConstructor;
+
 @RestController
+@RequiredArgsConstructor
 public class ProfileController {
     private final JdbcTemplate jdbc;
-    public ProfileController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    private final ProfileService profileService;
 
     record ProfileRequest(String pseudo, String country, String language) {}
+    record PatronRequest(String cardId) {}
 
     @PostMapping("/api/profile")
     public ResponseEntity<?> create(@RequestAttribute("userId") String userId,
@@ -31,14 +38,14 @@ public class ProfileController {
         }
     }
 
-    record ProfileResponse(String pseudo, String country, String language) {}
-
     @GetMapping("/api/profile")
-    public ResponseEntity<ProfileResponse> me(@RequestAttribute("userId") String userId) {
-        List<ProfileResponse> rows = jdbc.query(
-            "SELECT pseudo, country, language FROM profiles WHERE user_id = ?",
-            (rs, i) -> new ProfileResponse(rs.getString("pseudo"), rs.getString("country"), rs.getString("language")),
-            userId);
-        return rows.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(rows.get(0));
+    public Info me(@RequestAttribute("userId") String userId) {
+        return profileService.require(userId);
+    }
+
+    @PutMapping("/api/profile/patron")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setPatron(@RequestAttribute("userId") String userId, @RequestBody PatronRequest r) {
+        profileService.setPatron(userId, r.cardId());
     }
 }

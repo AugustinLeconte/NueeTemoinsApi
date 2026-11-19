@@ -1,0 +1,1 @@
+ALTER TABLE profiles ADD COLUMN patron_card_id VARCHAR(64) NULL;

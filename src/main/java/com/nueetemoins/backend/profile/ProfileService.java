@@ -12,25 +12,39 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.nueetemoins.backend.card.CardNameService;
+
 import lombok.RequiredArgsConstructor;
 
-/** Lecture du profil pour les services joueur (pays + langue). */
+/** Lecture du profil pour les services joueur (pays + langue + saint patron). */
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
 
-    public record Info(String pseudo, String country, String language) {}
+    public record Info(String pseudo, String country, String language, String patronCardId) {}
+    public record Found(String userId, Info info) {}
 
     private final JdbcTemplate jdbc;
+    private final CardNameService cards;
 
     public Info require(String userId) {
         List<Info> rows = jdbc.query(
-            "SELECT pseudo, country, language FROM profiles WHERE user_id = ?",
-            (rs, i) -> new Info(rs.getString("pseudo"), rs.getString("country"), rs.getString("language")),
+            "SELECT pseudo, country, language, patron_card_id FROM profiles WHERE user_id = ?",
+            (rs, i) -> new Info(rs.getString("pseudo"), rs.getString("country"),
+                                rs.getString("language"), rs.getString("patron_card_id")),
             userId);
-        if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
-        }
+        if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
+        return rows.get(0);
+    }
+
+    public Found requireByPseudo(String pseudo) {
+        List<Found> rows = jdbc.query(
+            "SELECT user_id, pseudo, country, language, patron_card_id FROM profiles WHERE pseudo = ?",
+            (rs, i) -> new Found(rs.getString("user_id"),
+                new Info(rs.getString("pseudo"), rs.getString("country"),
+                         rs.getString("language"), rs.getString("patron_card_id"))),
+            pseudo);
+        if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Player not found");
         return rows.get(0);
     }
 
@@ -43,5 +57,15 @@ public class ProfileService {
             (RowCallbackHandler) rs -> out.put(rs.getString("user_id"), rs.getString("pseudo")),
             userIds.toArray());
         return out;
+    }
+
+    /** cardId null ou vide = retirer le saint patron. */
+    public void setPatron(String userId, String cardId) {
+        String id = (cardId == null || cardId.isBlank()) ? null : cardId;
+        if (id != null && !cards.exists(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown card");
+        }
+        int updated = jdbc.update("UPDATE profiles SET patron_card_id = ? WHERE user_id = ?", id, userId);
+        if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
     }
 }
