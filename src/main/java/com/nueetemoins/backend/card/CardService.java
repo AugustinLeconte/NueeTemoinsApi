@@ -1,8 +1,11 @@
 package com.nueetemoins.backend.card;
 
+import java.text.Collator;
 import java.time.DateTimeException;
 import java.time.MonthDay;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -33,6 +36,7 @@ public class CardService {
 
     private static final String DEFAULT_LOCALE = "fr";
     private static final String DEFAULT_COUNTRY = "FR";
+    private static final Comparator<? super CardResponse> BY_FEAST_DATE_THEN_TITLE = null;
 
     private final CardRepository cardRepository;
     private final FamilyService familyService;
@@ -42,8 +46,21 @@ public class CardService {
 
     @Transactional(readOnly = true)
     public List<CardResponse> findAll(String lang, String country) {
+        String l = normLocale(lang);
+        String c = normCountry(country);
+
+        Collator collator = Collator.getInstance(Locale.forLanguageTag(l));
+        collator.setStrength(Collator.PRIMARY);
+
+        Comparator<CardResponse> order = Comparator
+            .comparing((CardResponse r) -> r.feastMonth() == null)
+            .thenComparing(CardResponse::feastMonth, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(CardResponse::feastDay,   Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(CardResponse::title,      Comparator.nullsLast(collator::compare));
+
         return cardRepository.findAll().stream()
-            .map(c -> toResponse(c, normLocale(lang), normCountry(country)))
+            .map(card -> toResponse(card, l, c))
+            .sorted(order)
             .toList();
     }
 

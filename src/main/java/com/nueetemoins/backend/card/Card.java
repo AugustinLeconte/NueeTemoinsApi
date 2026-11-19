@@ -1,14 +1,18 @@
 package com.nueetemoins.backend.card;
 
+import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import org.hibernate.annotations.BatchSize;
 
+import com.nueetemoins.backend.card.dto.CardResponse;
 import com.nueetemoins.backend.family.Family;
 
 import jakarta.persistence.CascadeType;
