@@ -1,5 +1,7 @@
 package com.nueetemoins.backend.profile;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,32 +22,43 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
-
-    public record Info(String pseudo, String country, String language, String patronCardId) {}
-    public record Found(String userId, Info info) {}
+    public static final String TERMS_VERSION = "2026-11-20";
 
     private final JdbcTemplate jdbc;
     private final CardNameService cards;
 
+    public record Info(String pseudo, String country, String language,
+                    String patronCardId, boolean termsAccepted) {}
+    public record Found(String userId, Info info) {}
+
+    private static Info toInfo(ResultSet rs) throws SQLException {
+        return new Info(rs.getString("pseudo"), rs.getString("country"),
+                        rs.getString("language"), rs.getString("patron_card_id"),
+                        TERMS_VERSION.equals(rs.getString("terms_accepted_version")));
+    }
+
     public Info require(String userId) {
         List<Info> rows = jdbc.query(
-            "SELECT pseudo, country, language, patron_card_id FROM profiles WHERE user_id = ?",
-            (rs, i) -> new Info(rs.getString("pseudo"), rs.getString("country"),
-                                rs.getString("language"), rs.getString("patron_card_id")),
-            userId);
+            "SELECT pseudo, country, language, patron_card_id, terms_accepted_version FROM profiles WHERE user_id = ?",
+            (rs, i) -> toInfo(rs), userId);
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
         return rows.get(0);
     }
 
     public Found requireByPseudo(String pseudo) {
         List<Found> rows = jdbc.query(
-            "SELECT user_id, pseudo, country, language, patron_card_id FROM profiles WHERE pseudo = ?",
-            (rs, i) -> new Found(rs.getString("user_id"),
-                new Info(rs.getString("pseudo"), rs.getString("country"),
-                         rs.getString("language"), rs.getString("patron_card_id"))),
+            "SELECT user_id, pseudo, country, language, patron_card_id, terms_accepted_version FROM profiles WHERE pseudo = ?",
+            (rs, i) -> new Found(rs.getString("user_id"), toInfo(rs)),
             pseudo);
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Player not found");
         return rows.get(0);
+    }
+
+    public void acceptTerms(String userId) {
+        int updated = jdbc.update(
+            "UPDATE profiles SET terms_accepted_version = ?, terms_accepted_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+            TERMS_VERSION, userId);
+        if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found");
     }
 
     /** userId -> pseudo, en une seule requête. */
